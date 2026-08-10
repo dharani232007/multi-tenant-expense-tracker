@@ -1,0 +1,158 @@
+// ============================================================
+// Prisma schema - Multi-Tenant SaaS Expense Tracker
+// Owner: Person 2 (Database + Multi-Tenancy + Security)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+// ENUMS
+// ------------------------------------------------------------
+
+enum Plan {
+  STANDARD
+  ENTERPRISE
+}
+
+enum IsolationType {
+  SHARED
+  PRIVATE_SCHEMA
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+  MANAGER
+  FINANCE
+}
+
+enum ExpenseCategory {
+  TRAVEL
+  FOOD
+  OFFICE
+  INFRASTRUCTURE
+  SALARY
+  EQUIPMENT
+  OTHER
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REIMBURSED
+}
+
+enum AuditAction {
+  CREATED
+  UPDATED
+  APPROVED
+  REJECTED
+  DELETED
+}
+
+// ------------------------------------------------------------
+// TENANT
+// Every company (tenant) using the SaaS platform.
+// ------------------------------------------------------------
+model Tenant {
+  id            String        @id @default(uuid())
+  name          String
+  plan          Plan          @default(STANDARD)
+  isolationType IsolationType @default(SHARED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  users       User[]
+  expenses    Expense[]
+  auditEvents AuditEvent[]
+
+  @@index([plan])
+}
+
+// ------------------------------------------------------------
+// USER
+// A user belongs to exactly ONE tenant (tenantId is required).
+// ------------------------------------------------------------
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(EMPLOYEE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  expenses    Expense[]
+  auditEvents AuditEvent[]
+
+  // tenantId indexed -> every "get all users of a tenant" query is fast
+  // email is unique -> also indexed automatically, used at login
+  @@index([tenantId])
+}
+
+// ------------------------------------------------------------
+// EXPENSE
+// Belongs to a tenant AND to the user who created it.
+// tenantId is duplicated here (not just derived through user)
+// on purpose -> lets us filter/query expenses by tenant directly
+// without joining through User every time. This is the core of
+// tenant isolation at the data layer.
+// ------------------------------------------------------------
+model Expense {
+  id          String          @id @default(uuid())
+  tenantId    String
+  userId      String
+  amount      Decimal         @db.Decimal(12, 2)
+  category    ExpenseCategory
+  description String?
+  date        DateTime
+  status      ExpenseStatus   @default(PENDING)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auditEvents AuditEvent[]
+
+  // tenantId -> every expense list/report query filters by tenant first
+  // userId   -> "my expenses" queries
+  // composite index -> the most common real query shape:
+  //   "give me tenant X's expenses" (and often also filtered by status)
+  @@index([tenantId])
+  @@index([userId])
+  @@index([tenantId, status])
+}
+
+// ------------------------------------------------------------
+// AUDIT EVENT
+// Immutable history of what happened to an expense.
+// Never updated or deleted after insert - only inserted.
+// ------------------------------------------------------------
+model AuditEvent {
+  id        String      @id @default(uuid())
+  tenantId  String
+  expenseId String
+  userId    String
+  action    AuditAction
+  details   String?
+  timestamp DateTime    @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // tenantId   -> "show all audit events for tenant X"
+  // expenseId  -> "show full history of this one expense"
+  @@index([tenantId])
+  @@index([expenseId])
+}
