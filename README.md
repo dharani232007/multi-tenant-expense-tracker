@@ -1,190 +1,845 @@
 # Multi-Tenant SaaS Expense Tracker
 
+A secure, scalable, and responsive **Multi-Tenant SaaS Expense Tracker** designed to allow multiple organizations to manage company expenses, approvals, reimbursements, reports, and audit history while maintaining strict tenant-level data isolation.
+
+---
+
 ## 📌 Project Overview
 
-The **Multi-Tenant SaaS Expense Tracker** is a cloud-based Software-as-a-Service (SaaS) application designed to help multiple organizations or customers manage their expenses securely within a single platform.
+The **Multi-Tenant SaaS Expense Tracker** is a Software-as-a-Service application that allows multiple organizations, called **tenants**, to use the same application while keeping their data isolated.
 
-The system follows a **multi-tenant architecture**, where multiple customers (tenants) can use the same application while keeping their data logically isolated and secure.
+### Example Tenants
 
-The application allows users to:
+```text
+Company A
+Company B
+Company C
+```
 
-* Register and log in securely
-* Belong to a specific tenant/organization
-* Add, edit, view, and delete expenses
-* Categorize expenses
-* Track spending
-* View expense summaries and reports
-* Access only the data belonging to their organization
-* Scale according to the number of users and tenants
+Each organization can manage its own:
+
+* Users
+* Expenses
+* Approvals
+* Reimbursements
+* Reports
+* Audit history
+
+The most important security requirement is:
+
+```text
+Company A → Company A data only
+Company B → Company B data only
+Company C → Company C data only
+```
+
+A user from one tenant must never be able to access another tenant's data.
+
+### Important Security Principle
+
+Tenant isolation is **not enforced by the frontend**.
+
+The backend is responsible for:
+
+1. Identifying the authenticated user.
+2. Determining the user's tenant.
+3. Validating access.
+4. Filtering database queries by the authenticated tenant.
+5. Rejecting cross-tenant access attempts.
+
+The frontend only consumes the secure APIs provided by the backend.
 
 ---
 
 # 🎯 Problem Statement
 
-Traditional expense management systems may require separate applications or infrastructure for different organizations. This can increase infrastructure costs, maintenance effort, and operational complexity.
+Traditional expense management systems can become difficult to maintain when multiple organizations need to use the same application.
 
-The goal of this project is to develop a **Multi-Tenant SaaS Expense Tracker** where multiple organizations can use the same application while maintaining proper data isolation.
+A multi-tenant expense management platform must provide:
 
-The system should:
+* Secure tenant isolation
+* User and role management
+* Expense creation and tracking
+* Manager approval workflows
+* Finance reimbursement tracking
+* Reports and summaries
+* Complete audit history
+* Responsive user interface
+* Scalable architecture
 
-1. Support multiple tenants.
-2. Keep tenant data isolated.
-3. Provide secure authentication and authorization.
-4. Allow users to manage expense records.
-5. Support different data-isolation strategies for different tenant sizes.
-6. Provide scalable infrastructure.
-7. Maintain permanent expense records.
-8. Support monitoring and deployment using cloud-native technologies.
+The system must ensure that one organization cannot access another organization's expenses, users, reports, or audit records.
 
 ---
 
-# 💡 Proposed Solution
+# 🎯 Project Objectives
 
-Our solution uses a **multi-tenant SaaS architecture**.
+The main objectives of this project are:
 
-Each request is associated with a specific tenant/customer identity. The backend identifies the tenant before accessing data.
-
-The system can support different storage strategies:
-
-### Small / Standard Tenants
-
-Multiple tenants can share the same PostgreSQL database while their data remains logically separated using tenant identifiers.
-
-Example:
-
-```text
-Database
-│
-├── Expenses
-│     ├── tenant_id = T001
-│     ├── tenant_id = T002
-│     └── tenant_id = T003
-│
-└── Users
-      ├── tenant_id = T001
-      ├── tenant_id = T002
-      └── tenant_id = T003
-```
-
-### Large / Premium Tenants
-
-Large customers can be provided with a dedicated database schema or dedicated database depending on their requirements.
-
-Example:
-
-```text
-PostgreSQL
-│
-├── tenant_a_schema
-│     ├── users
-│     └── expenses
-│
-├── tenant_b_schema
-│     ├── users
-│     └── expenses
-│
-└── shared_schema
-      └── common_data
-```
-
-This approach provides flexibility, security, and scalability.
+1. Build a multi-tenant SaaS expense management platform.
+2. Allow multiple organizations to use the same application.
+3. Maintain strict tenant-level data isolation.
+4. Provide role-based application workflows.
+5. Allow employees to create and manage expenses.
+6. Allow managers to approve or reject expenses.
+7. Allow finance users to manage reimbursements.
+8. Provide expense reports and summaries.
+9. Maintain a complete audit trail.
+10. Provide testing for authentication, authorization, tenant isolation, and integration.
+11. Build a clean and responsive SaaS-style frontend.
+12. Design a database structure that can support future tenant scaling.
 
 ---
 
 # 🏗️ System Architecture
 
-The high-level architecture is:
+The overall system follows this architecture:
 
 ```text
                     ┌──────────────────────┐
-                    │       Users          │
+                    │      React UI        │
+                    │      Frontend        │
+                    └──────────┬───────────┘
+                               │
+                               │ REST API
+                               ▼
+                    ┌──────────────────────┐
+                    │   Express Backend    │
+                    │   Business Logic     │
                     └──────────┬───────────┘
                                │
                                ▼
                     ┌──────────────────────┐
-                    │    React Frontend    │
+                    │ Authentication / JWT │
+                    │ Tenant Identification│
                     └──────────┬───────────┘
                                │
                                ▼
                     ┌──────────────────────┐
-                    │      API Gateway     │
+                    │   Prisma ORM Layer   │
                     └──────────┬───────────┘
                                │
                                ▼
-              ┌────────────────────────────────┐
-              │       Spring Boot Backend      │
-              │                                │
-              │ Authentication & Authorization │
-              │ Tenant Identification          │
-              │ Expense Management              │
-              │ Multi-Tenancy Logic             │
-              └───────────────┬────────────────┘
-                              │
-              ┌───────────────┼────────────────┐
-              │               │                │
-              ▼               ▼                ▼
-       ┌────────────┐   ┌────────────┐   ┌────────────┐
-       │ PostgreSQL │   │   Kafka    │   │ Monitoring │
-       │  Database  │   │   Events   │   │ Prometheus │
-       └────────────┘   └────────────┘   └────────────┘
-                              │
-                              ▼
-                       ┌────────────┐
-                       │ Consumers  │
-                       └────────────┘
+                    ┌──────────────────────┐
+                    │     PostgreSQL       │
+                    │       Database       │
+                    └──────────────────────┘
+```
+
+### Tenant Isolation Flow
+
+```text
+User Login
+    ↓
+Authentication
+    ↓
+Authenticated User
+    ↓
+Determine tenantId
+    ↓
+Backend validates tenant access
+    ↓
+Prisma query
+    ↓
+PostgreSQL
+    ↓
+Only authenticated tenant's data
 ```
 
 ---
 
-# 🛠️ Technologies Used
+# 🧑‍💻 Team Responsibilities
+
+The project is divided among four team members.
+
+## Team Member 1 / Backend Developer
+
+Responsible for:
+
+* Node.js
+* Express.js
+* REST APIs
+* JWT authentication
+* Business logic
+* API integration
+* Backend authorization
+* Tenant identification
+* Connecting backend with Prisma/PostgreSQL
+
+---
+
+## Team Member 2 / Database Developer
+
+Responsible for:
+
+* PostgreSQL
+* Prisma ORM
+* Database schema
+* Database relationships
+* Foreign keys
+* Constraints
+* Indexes
+* Tenant data isolation at database/query level
+* Database migrations
+* Seed/test data
+* Database integration support
+
+---
+
+## Team Member 3 / Audit, Testing & Documentation
+
+Responsible for:
+
+* Audit History functionality
+* Application testing
+* Tenant isolation testing
+* API testing
+* Integration testing
+* Bug tracking
+* Documentation
+* Testing reports
+* PPT evidence
+* Audit History UI support
+
+---
+
+## Team Member 4 / Frontend Developer
+
+Responsible for:
+
+* React frontend
+* React Router
+* Axios API communication
+* Login/Register UI
+* Dashboard
+* Expense management UI
+* Manager approval UI
+* Finance UI
+* Reports UI
+* Audit History UI
+* Role-based navigation
+* Responsive design
+* Frontend loading/error/empty states
+
+---
+
+# 🛠️ Technologies
 
 ## Frontend
 
-* React.js
+* React
 * JavaScript
-* HTML5
-* CSS
-* Axios
 * React Router
+* Axios
+* CSS / Tailwind CSS
 
 ## Backend
 
-* Java
-* Spring Boot
-* Spring Security
-* Spring Data JPA
-* Hibernate
-* Hibernate Multi-Tenancy
-* HikariCP
+* Node.js
+* Express.js
+* JWT
 * REST APIs
 
 ## Database
 
 * PostgreSQL
-* Hibernate ORM
+* Prisma ORM
 
-## Messaging
-
-* Apache Kafka
-
-## DevOps / Deployment
-
-* Docker
-* Docker Compose
-* Kubernetes
-
-## Monitoring
-
-* Prometheus
-
-## Version Control
+## Development & Testing
 
 * Git
 * GitHub
+* VS Code
+* Postman
+* Prisma Studio
+
+## Future / Deployment Technologies
+
+The project architecture is designed to support:
+
+* Docker
+* Kubernetes
+* Prometheus
+
+These are not part of the initial database implementation.
 
 ---
 
-# 📂 Project Folder Structure
+# 👥 User Roles
+
+The application supports four roles:
+
+```text
+ADMIN
+EMPLOYEE
+MANAGER
+FINANCE
+```
+
+## Employee
+
+Employees can:
+
+* View dashboard
+* Add expenses
+* View their expenses
+* View expense details
+
+Navigation:
+
+```text
+Dashboard
+Add Expense
+My Expenses
+Expense Details
+```
+
+---
+
+## Manager
+
+Managers can:
+
+* View dashboard
+* View expenses
+* View pending approvals
+* Approve expenses
+* Reject expenses
+* View audit history
+
+Navigation:
+
+```text
+Dashboard
+Expenses
+Pending Approvals
+Audit History
+```
+
+---
+
+## Finance
+
+Finance users can:
+
+* View dashboard
+* View approved expenses
+* Manage reimbursements
+* View reports
+
+Navigation:
+
+```text
+Dashboard
+Approved Expenses
+Reimbursements
+Reports
+```
+
+---
+
+## Admin
+
+Administrators can:
+
+* View dashboard
+* Manage users
+* View expenses
+* View reports
+* View audit history
+
+Navigation:
+
+```text
+Dashboard
+Users
+Expenses
+Reports
+Audit History
+```
+
+---
+
+# 🏢 Multi-Tenant Architecture
+
+The application supports multiple organizations.
+
+Example:
+
+```text
+Tenant A
+├── Users
+├── Expenses
+└── Audit Events
+
+Tenant B
+├── Users
+├── Expenses
+└── Audit Events
+
+Tenant C
+├── Users
+├── Expenses
+└── Audit Events
+```
+
+For the first implementation, the project uses:
+
+```text
+Shared PostgreSQL Database
+        ↓
+Shared Tables
+        ↓
+tenantId-based isolation
+```
+
+Example:
+
+```text
+expenses
+
+id | tenantId | amount | category
+-----------------------------------
+1  | tenant-A | 5000   | TRAVEL
+2  | tenant-B | 3000   | FOOD
+3  | tenant-A | 2000   | OFFICE
+```
+
+A tenant-specific query conceptually follows:
+
+```text
+WHERE tenantId = authenticatedTenantId
+```
+
+The backend obtains the authenticated tenant ID.
+
+The frontend must never allow users to manually select another tenant.
+
+---
+
+# 🔐 Tenant Isolation
+
+Tenant isolation is one of the most important requirements of the project.
+
+### Required behavior
+
+```text
+Tenant A → A data       ✅
+Tenant B → B data       ✅
+Tenant C → C data       ✅
+
+Tenant A → B data       ❌
+Tenant B → A data       ❌
+Tenant C → A data       ❌
+```
+
+The frontend must not implement tenant security as its primary mechanism.
+
+The backend must:
+
+1. Authenticate the user.
+2. Determine the user's tenant.
+3. Validate the requested resource.
+4. Apply tenant filtering.
+5. Reject unauthorized cross-tenant requests.
+
+---
+
+# 🗄️ Database Design
+
+The primary database entities are:
+
+```text
+Tenant
+   │
+   ├── Users
+   │
+   ├── Expenses
+   │
+   └── AuditEvents
+
+User
+   │
+   └── Expenses
+
+Expense
+   │
+   └── AuditEvents
+```
+
+---
+
+## Tenant
+
+Important fields:
+
+```text
+id
+name
+plan
+isolationType
+createdAt
+updatedAt
+```
+
+Plans:
+
+```text
+STANDARD
+ENTERPRISE
+```
+
+Isolation types:
+
+```text
+SHARED
+PRIVATE_SCHEMA
+```
+
+---
+
+## User
+
+Important fields:
+
+```text
+id
+tenantId
+name
+email
+passwordHash
+role
+createdAt
+updatedAt
+```
+
+Roles:
+
+```text
+ADMIN
+EMPLOYEE
+MANAGER
+FINANCE
+```
+
+Each user belongs to exactly one tenant.
+
+---
+
+## Expense
+
+Important fields:
+
+```text
+id
+tenantId
+userId
+amount
+category
+description
+date
+status
+createdAt
+updatedAt
+```
+
+### Expense Status
+
+```text
+PENDING
+APPROVED
+REJECTED
+REIMBURSED
+```
+
+### Expense Categories
+
+```text
+TRAVEL
+FOOD
+OFFICE
+INFRASTRUCTURE
+SALARY
+EQUIPMENT
+OTHER
+```
+
+---
+
+## AuditEvent
+
+Important fields:
+
+```text
+id
+tenantId
+expenseId
+userId
+action
+details
+timestamp
+```
+
+### Audit Actions
+
+```text
+CREATED
+UPDATED
+APPROVED
+REJECTED
+DELETED
+```
+
+---
+
+# 💰 Expense Management
+
+The application supports:
+
+* Add Expense
+* View Expense List
+* View Expense Details
+* Edit Expense
+* Delete Expense
+
+Expense information includes:
+
+```text
+Amount
+Category
+Description
+Date
+Status
+```
+
+---
+
+# 👨‍💼 Manager Approval
+
+Managers can:
+
+1. View pending expenses.
+2. Open expense details.
+3. Approve expenses.
+4. Reject expenses.
+5. Provide a rejection reason when required.
+
+Approval flow:
+
+```text
+Employee
+   ↓
+Create Expense
+   ↓
+PENDING
+   ↓
+Manager Reviews
+   ↓
+ ┌───────────────┐
+ │               │
+ ▼               ▼
+APPROVED       REJECTED
+```
+
+---
+
+# 💳 Finance & Reimbursement
+
+Finance users can:
+
+* View approved expenses.
+* View reimbursement/payment status.
+* Update reimbursement status when supported by the backend API.
+
+Possible final expense status:
+
+```text
+REIMBURSED
+```
+
+---
+
+# 📊 Dashboard
+
+The dashboard provides information such as:
+
+* Total expenses
+* Pending expenses
+* Approved expenses
+* Rejected expenses
+* Total amount spent
+* Recent expenses
+* Expense category summary
+
+The dashboard data is obtained from backend APIs.
+
+---
+
+# 📈 Reports
+
+The reports module can display:
+
+* Total expenses
+* Expenses by category
+* Expenses by date
+* Approved expenses
+* Pending expenses
+* Rejected expenses
+* Total spending
+
+Simple charts may be used when they improve readability.
+
+---
+
+# 📝 Audit History
+
+The system maintains a traceable history of important expense operations.
+
+Recorded actions include:
+
+```text
+CREATED
+UPDATED
+APPROVED
+REJECTED
+DELETED
+```
+
+Example:
+
+```text
+Tenant A
+   ↓
+Employee creates ₹5000 expense
+   ↓
+Expense saved
+   ↓
+Audit Event Created
+   ↓
+Action: CREATED
+User: Employee A
+Expense: #101
+Time: 10:30 AM
+```
+
+The Audit History UI displays:
+
+```text
+Date | User | Action | Expense | Details
+```
+
+Tenant isolation must also apply to audit records.
+
+---
+
+# 🔌 REST API Structure
+
+The frontend communicates with the backend through REST APIs.
+
+## Authentication
+
+```http
+POST /api/auth/register
+POST /api/auth/login
+```
+
+---
+
+## Expenses
+
+```http
+POST   /api/expenses
+GET    /api/expenses
+GET    /api/expenses/:id
+PUT    /api/expenses/:id
+DELETE /api/expenses/:id
+```
+
+---
+
+## Approval
+
+```http
+POST /api/expenses/:id/approve
+POST /api/expenses/:id/reject
+```
+
+---
+
+## Reports
+
+```http
+GET /api/reports/summary
+```
+
+---
+
+## Audit
+
+```http
+GET /api/audit
+```
+
+API contracts should not be changed without discussion between the team members.
+
+---
+
+# 🔑 Authentication Flow
+
+The authentication flow is:
+
+```text
+User
+ ↓
+Login Page
+ ↓
+POST /api/auth/login
+ ↓
+Backend validates credentials
+ ↓
+JWT/token returned
+ ↓
+Frontend stores authentication token
+ ↓
+Axios sends token with requests
+ ↓
+Backend authenticates request
+ ↓
+Backend identifies tenant
+ ↓
+Backend returns authorized data
+```
+
+Unauthenticated users should be redirected to the Login page.
+
+---
+
+# 🖥️ Frontend Structure
+
+The frontend follows a modular React structure:
+
+```text
+frontend/
+└── src/
+    ├── components/
+    ├── pages/
+    ├── layouts/
+    ├── services/
+    ├── context/
+    ├── hooks/
+    ├── routes/
+    ├── utils/
+    ├── assets/
+    ├── App.jsx
+    └── main.jsx
+```
+
+The structure can be adjusted when required, but unnecessary files should be avoided.
+
+---
+
+# 📁 Complete Project Folder Structure
+
+The overall repository is organized as:
 
 ```text
 multi-tenant-expense-tracker/
@@ -197,327 +852,349 @@ multi-tenant-expense-tracker/
 │
 ├── backend/
 │   ├── src/
-│   ├── pom.xml
+│   ├── package.json
 │   └── README.md
 │
 ├── database/
-│   ├── schema/
-│   ├── migrations/
-│   └── seed/
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   ├── migrations/
+│   │   └── seed.js
+│   └── DATABASE.md
 │
 ├── docs/
-│   ├── architecture/
-│   ├── api/
-│   └── screenshots/
+│   ├── testing.md
+│   ├── audit-history.md
+│   └── integration-testing.md
 │
 ├── docker-compose.yml
-│
-├── .gitignore
 │
 └── README.md
 ```
 
 ---
 
-# 👥 Team Members
+# 🧪 Testing Strategy
 
-| Member   | Role                            | Main Responsibility                                          |
-| -------- | ------------------------------- | ------------------------------------------------------------ |
-| Dharani  |  Backend Developer | Backend APIs, authentication, tenant management, integration |
-| Archana  | Frontend Developer              | React UI, dashboard, expense screens                         |
-| Sarulatha | Database Developer              | PostgreSQL schema, tables, relationships, database setup     |
-| Haripriya | DevOps / Integration Developer  | Docker, Kafka, Kubernetes, monitoring, deployment            |
+Testing is performed at multiple levels.
 
-> Replace the member names and roles with the actual team information.
+## Authentication Testing
 
----
+Test:
 
-# 🔐 Main Features
-
-## 1. Authentication
-
-Users can:
-
-* Register
-* Login
+* Valid login
+* Invalid login
 * Logout
-* Access protected resources
-* Authenticate using secure credentials
-
-Spring Security will be used for authentication and authorization.
+* Unauthorized access
+* Invalid token
+* Expired token
 
 ---
 
-## 2. Tenant Management
+## Expense Testing
 
-Every user belongs to a specific tenant/organization.
+Test:
 
-Example:
+* Create expense
+* View expense
+* Update expense
+* Delete expense
+* Invalid expense data
+* Negative amount
+* Missing required fields
+* Non-existent expense ID
+
+---
+
+## Approval Testing
+
+Test:
+
+* Manager approves expense
+* Manager rejects expense
+* Employee cannot perform manager-only actions
+* Invalid approval request
+
+---
+
+# 🔒 Tenant Isolation Testing
+
+Tenant isolation is a critical test area.
+
+### Test Environment
 
 ```text
 Tenant A
-├── User 1
-├── User 2
-└── Expenses
+├── User A
+└── Expense A1
 
 Tenant B
-├── User 3
-├── User 4
-└── Expenses
+├── User B
+└── Expense B1
 ```
 
-A user from Tenant A must not be able to access Tenant B's data.
-
----
-
-## 3. Expense Management
-
-Users can:
-
-* Add expenses
-* View expenses
-* Update expenses
-* Delete expenses
-* Categorize expenses
-* Search expenses
-* Filter expenses
-* View expense history
-
-Example expense:
+### Test 1
 
 ```text
-Expense ID: EXP001
-Tenant ID: TEN001
-User ID: USER001
-Category: Food
-Amount: ₹500
-Date: 2026-08-10
-Description: Team Lunch
+Login as User A
+        ↓
+Request expenses
+        ↓
+Expected: Expense A1 only
 ```
 
----
-
-## 4. Tenant Data Isolation
-
-Tenant isolation is one of the most important features of this project.
-
-Every request must be associated with a tenant.
-
-Example:
+### Test 2
 
 ```text
-Request
-   ↓
-Authentication
-   ↓
-Identify User
-   ↓
-Identify Tenant
-   ↓
-Validate Tenant Access
-   ↓
-Query Tenant Data
-   ↓
-Return Response
+Login as User B
+        ↓
+Request expenses
+        ↓
+Expected: Expense B1 only
 ```
 
-The application must prevent users from accessing data belonging to another tenant.
-
----
-
-## 5. Expense Permanence
-
-Expense records should not be accidentally lost.
-
-Important expense information must be stored reliably in PostgreSQL.
-
-Database operations should maintain data consistency and integrity.
-
----
-
-## 6. Scalability
-
-The application should be designed to support increasing numbers of:
-
-* Users
-* Tenants
-* Expense records
-* API requests
-
-Docker and Kubernetes can be used to support scalable deployment.
-
----
-
-# 🔄 Request Flow
-
-A typical request follows this process:
+### Test 3
 
 ```text
-User
- ↓
+User A
+   ↓
+Request Expense B1
+   ↓
+Expected: ACCESS DENIED / NOT FOUND
+```
+
+### Test 4
+
+```text
+User A
+   ↓
+Attempt to modify Expense B1
+   ↓
+Expected: Operation rejected
+```
+
+### Test 5
+
+```text
+User A
+   ↓
+Attempt to delete Expense B1
+   ↓
+Expected: Operation rejected
+```
+
+### Test 6
+
+```text
+User A
+   ↓
+Request Tenant B audit events
+   ↓
+Expected: Access denied
+```
+
+No fake test results should be added to the documentation.
+
+Only actual test results should be recorded.
+
+---
+
+# 🔄 End-to-End Integration Flow
+
+The complete application flow is:
+
+```text
+REGISTER
+   ↓
+LOGIN
+   ↓
+DASHBOARD
+   ↓
+ADD EXPENSE
+   ↓
+DATABASE
+   ↓
+MANAGER APPROVAL
+   ↓
+AUDIT EVENT
+   ↓
+REPORT
+```
+
+Technical integration:
+
+```text
 React Frontend
- ↓
-HTTP Request
- ↓
-Authentication
- ↓
+      ↓
+Axios
+      ↓
+Express REST API
+      ↓
+JWT Authentication
+      ↓
 Tenant Identification
- ↓
-Authorization
- ↓
-Spring Boot Controller
- ↓
-Service Layer
- ↓
-Repository Layer
- ↓
+      ↓
+Prisma
+      ↓
 PostgreSQL
- ↓
-Response
- ↓
-React Frontend
- ↓
-User
 ```
 
 ---
 
-# 📨 Kafka Event Flow
+# 🧪 API Testing
 
-Kafka can be used for asynchronous operations and event-driven communication.
+API testing can be performed using Postman.
 
-Example:
+Important endpoints:
 
-```text
-User Adds Expense
-       ↓
-Spring Boot Backend
-       ↓
-Save Expense
-       ↓
-Publish Expense Event
-       ↓
-Kafka Topic
-       ↓
-Kafka Consumer
-       ↓
-Process Event
+```http
+POST /api/auth/register
+POST /api/auth/login
+
+POST /api/expenses
+GET /api/expenses
+GET /api/expenses/:id
+PUT /api/expenses/:id
+DELETE /api/expenses/:id
+
+POST /api/expenses/:id/approve
+POST /api/expenses/:id/reject
+
+GET /api/reports/summary
+GET /api/audit
 ```
 
-Possible events include:
+For each endpoint, test:
+
+* Valid request
+* Invalid request
+* Unauthorized request
+* Wrong-tenant request where applicable
+* Expected status code
+* Response body
+
+---
+
+# 📱 Responsive Design
+
+The frontend should support:
 
 ```text
-ExpenseCreated
-ExpenseUpdated
-ExpenseDeleted
+Desktop
+Tablet
+Mobile
+```
+
+The UI should include:
+
+* Sidebar navigation
+* Top navigation/header
+* Dashboard cards
+* Tables
+* Forms
+* Status badges
+* Loading states
+* Error messages
+* Empty states
+* Confirmation dialogs
+
+The interface should remain professional and simple without unnecessary animations.
+
+---
+
+# 🌱 Git Workflow
+
+The project uses Git and GitHub for collaborative development.
+
+The main branches are:
+
+```text
+main
+develop
+```
+
+### Branch Purpose
+
+`main`
+
+```text
+Stable / final version
+```
+
+`develop`
+
+```text
+Integration branch for team development
+```
+
+Feature branches are created from `develop`.
+
+---
+
+# 🌿 Branch Naming Convention
+
+Recommended branches:
+
+```text
+feature/frontend
+feature/backend
+feature/database
+feature/testing
+```
+
+Additional branches can use:
+
+```text
+feature/login
+feature/expense-management
+feature/audit-history
+feature/reports
+fix/login-error
+fix/tenant-isolation
+docs/testing
 ```
 
 ---
 
-# 🐳 Docker
+# 🔄 Team Git Workflow
 
-Docker is used to create consistent environments for development and deployment.
-
-Possible containers:
+The normal workflow is:
 
 ```text
-Docker
-│
-├── Frontend
-├── Backend
-├── PostgreSQL
-├── Kafka
-├── Zookeeper / Kafka dependency
-└── Prometheus
+develop
+   ↓
+Create feature branch
+   ↓
+Write code
+   ↓
+Test locally
+   ↓
+git add
+   ↓
+git commit
+   ↓
+git push
+   ↓
+Create Pull Request
+   ↓
+Team review
+   ↓
+Merge into develop
 ```
 
-The project can be started using:
+Do not directly push experimental or unfinished work to `main`.
+
+---
+
+# 💻 Git Commands
+
+## Clone the Repository
 
 ```bash
-docker compose up --build
+git clone <YOUR_GITHUB_REPOSITORY_URL>
 ```
 
-To stop the containers:
-
-```bash
-docker compose down
-```
-
----
-
-# ☸️ Kubernetes
-
-Kubernetes can be used for container orchestration and scalability.
-
-Possible Kubernetes components:
-
-```text
-Kubernetes Cluster
-│
-├── Frontend Deployment
-├── Backend Deployment
-├── PostgreSQL
-├── Kafka
-└── Monitoring
-```
-
-Kubernetes can help with:
-
-* Scaling
-* Service discovery
-* Container management
-* Health checks
-* Rolling updates
-
----
-
-# 📊 Monitoring
-
-Prometheus can be used to monitor the application.
-
-Possible metrics include:
-
-* API request count
-* Response time
-* Error rate
-* CPU usage
-* Memory usage
-* Application health
-* Service availability
-
----
-
-# 🚀 Getting Started
-
-## Prerequisites
-
-Install the following software before running the project:
-
-* Git
-* Java JDK
-* Maven
-* Node.js
-* npm
-* PostgreSQL
-* Docker Desktop
-* Docker Compose
-
-Optional:
-
-* Kubernetes
-* kubectl
-
----
-
-# 📥 Clone the Repository
-
-Clone the repository using:
-
-```bash
-git clone <YOUR-GITHUB-REPOSITORY-URL>
-```
-
-Move into the project directory:
+Move into the project:
 
 ```bash
 cd multi-tenant-expense-tracker
@@ -525,107 +1202,43 @@ cd multi-tenant-expense-tracker
 
 ---
 
-# 🌿 Git Branch Structure
+## Check Current Branch
 
-The project uses the following branch structure:
-
-```text
-main
-│
-└── develop
-    │
-    ├── feature/backend
-    ├── feature/frontend
-    ├── feature/database
-    └── feature/devops
+```bash
+git branch
 ```
-
-## Branch Responsibilities
-
-### `main`
-
-Contains the stable and final version of the project.
-
-Only tested code should be merged into `main`.
-
-### `develop`
-
-Used for integrating completed features before the final release.
-
-### `feature/backend`
-
-Backend development.
-
-### `feature/frontend`
-
-Frontend development.
-
-### `feature/database`
-
-Database development.
-
-### `feature/devops`
-
-Docker, Kubernetes, Kafka, monitoring, and deployment work.
 
 ---
 
-# 🔀 Git Workflow
-
-Every team member should follow this workflow.
-
-## Step 1: Get the latest code
+## Get Latest Changes
 
 ```bash
-git checkout develop
 git pull origin develop
 ```
 
-## Step 2: Create or switch to your feature branch
+---
+
+## Create a Feature Branch
 
 Example:
 
 ```bash
-git checkout -b feature/backend
-```
-
-For frontend:
-
-```bash
+git checkout develop
+git pull origin develop
 git checkout -b feature/frontend
 ```
 
-For database:
-
-```bash
-git checkout -b feature/database
-```
-
-For DevOps:
-
-```bash
-git checkout -b feature/devops
-```
-
 ---
 
-## Step 3: Work on your assigned task
-
-Only modify the files related to your assigned responsibility.
-
----
-
-## Step 4: Check your changes
+## Check Changes
 
 ```bash
 git status
 ```
 
-Review the files before committing.
-
 ---
 
-## Step 5: Add changes
+## Add Changes
 
 ```bash
 git add .
@@ -633,318 +1246,605 @@ git add .
 
 ---
 
-## Step 6: Commit changes
-
-Use a meaningful commit message.
-
-Example:
+## Commit Changes
 
 ```bash
-git commit -m "Add expense creation API"
-```
-
-Other examples:
-
-```bash
-git commit -m "Create expense dashboard UI"
-git commit -m "Add tenant database schema"
-git commit -m "Configure Docker environment"
+git commit -m "Add frontend project setup"
 ```
 
 ---
 
-## Step 7: Push your branch
+## Push Branch
 
 ```bash
-git push origin feature/backend
+git push -u origin feature/frontend
 ```
 
-Replace the branch name according to your role.
+Then create a Pull Request on GitHub.
 
 ---
 
-# 🔃 Pull Request Workflow
+# ⚠️ Git Safety Rules
 
-After completing a task:
+Before starting work:
+
+```bash
+git checkout develop
+git pull origin develop
+```
+
+Create or switch to your feature branch.
+
+Before committing:
+
+```bash
+git status
+```
+
+Review your changes carefully.
+
+Do not commit:
 
 ```text
-Feature Branch
-      ↓
-Push to GitHub
-      ↓
-Create Pull Request
-      ↓
-Review
-      ↓
-Fix Issues if Required
-      ↓
-Merge into develop
+.env
+node_modules/
+passwords
+API secrets
+database credentials
+private keys
 ```
 
-Team members should **not directly push to `main`**.
-
-The team leader will review Pull Requests before merging.
+Use `.gitignore` to prevent sensitive or unnecessary files from being committed.
 
 ---
 
-# ⚠️ Important Git Rules
+# 🏃 How to Run the Project
 
-1. Do not directly modify `main`.
-2. Do not push another person's work into your branch.
-3. Always pull the latest `develop` before starting new work.
-4. Use meaningful commit messages.
-5. Create a Pull Request after completing a feature.
-6. Do not commit passwords, API keys, or secrets.
-7. Do not commit `.env` files containing real credentials.
-8. Resolve merge conflicts carefully.
-9. Test your changes before creating a Pull Request.
-10. Do not delete another person's work without discussion.
+The exact commands may change depending on the final implementation.
+
+## Frontend
+
+Navigate to:
+
+```bash
+cd frontend
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start development server:
+
+```bash
+npm run dev
+```
 
 ---
 
-# 🔒 Environment Variables
+## Backend
 
-Sensitive information should not be stored directly in the source code.
+Navigate to:
 
-Example:
+```bash
+cd backend
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the backend using the command defined in its `package.json`.
+
+For example:
+
+```bash
+npm run dev
+```
+
+---
+
+## Database
+
+The database uses PostgreSQL and Prisma.
+
+After PostgreSQL is configured, the database developer can run:
+
+```bash
+npx prisma generate
+```
+
+Apply development migrations:
+
+```bash
+npx prisma migrate dev
+```
+
+Open Prisma Studio:
+
+```bash
+npx prisma studio
+```
+
+Seed data will be added using the project's configured Prisma seed command.
+
+---
+
+# 🔐 Environment Variables
+
+Environment variables should be stored in `.env` files locally and should not be committed to GitHub.
+
+Example frontend configuration:
 
 ```text
-DB_HOST=
-DB_PORT=
-DB_NAME=
-DB_USERNAME=
-DB_PASSWORD=
-
-JWT_SECRET=
-
-KAFKA_BOOTSTRAP_SERVERS=
+VITE_API_BASE_URL=http://localhost:5000
 ```
 
-Create a local `.env` file when required.
+Example backend/database configuration:
 
-Make sure `.env` is included in `.gitignore`.
+```text
+DATABASE_URL=your_postgresql_connection_string
+JWT_SECRET=your_secret
+```
 
-Never upload real passwords, tokens, or API keys to GitHub.
+These values are examples only.
+
+Never commit real secrets to GitHub.
 
 ---
 
-# 🧪 Testing
+# 🧩 Development Order
 
-Before creating a Pull Request, verify:
-
-### Backend
-
-* Application starts successfully
-* APIs work correctly
-* Authentication works
-* Tenant isolation works
-* Database operations work
-* Invalid requests are handled
+The project will be developed in the following order.
 
 ### Frontend
 
-* Application starts successfully
-* Pages load correctly
-* API integration works
-* Forms work correctly
-* Authentication flow works
-* Dashboard displays correct information
-
-### Integration
-
-* Frontend communicates with backend
-* Backend communicates with PostgreSQL
-* Kafka communication works where implemented
-* Docker containers start correctly
-
----
-
-# 📝 API Documentation
-
-Backend APIs should be documented in:
-
 ```text
-docs/api/
+1. Project setup and folder structure
+2. Login/Register UI
+3. Routing and protected routes
+4. Dashboard
+5. Expense management
+6. Manager approval
+7. Finance/reimbursement
+8. Audit history
+9. Reports
+10. API integration
+11. Loading/error/empty states
+12. Responsive design
+13. Final testing
 ```
 
-Example:
+### Database
 
 ```text
-POST   /api/auth/register
-POST   /api/auth/login
-
-GET    /api/expenses
-POST   /api/expenses
-GET    /api/expenses/{id}
-PUT    /api/expenses/{id}
-DELETE /api/expenses/{id}
+1. Inspect repository
+2. Database design
+3. Prisma schema
+4. Migration
+5. PostgreSQL connection
+6. Seed data
+7. Relationship testing
+8. Tenant isolation testing
+9. DATABASE.md
+10. Backend integration instructions
 ```
 
-The exact API endpoints may change during development.
+### Testing & Documentation
+
+```text
+1. Inspect repository
+2. Audit functionality
+3. Audit History UI
+4. Authentication testing
+5. Expense testing
+6. Approval testing
+7. Tenant isolation testing
+8. API testing
+9. Integration testing
+10. Bug tracking
+11. Documentation
+12. PPT evidence
+```
 
 ---
 
 # 📚 Documentation
 
-Project documentation should be maintained inside:
+Project documentation is maintained inside:
 
 ```text
 docs/
 ```
 
-Recommended documentation:
+Important documents include:
 
 ```text
 docs/
-├── architecture/
-│   ├── system-architecture.md
-│   └── multi-tenancy.md
-│
-├── api/
-│   └── api-documentation.md
-│
-└── screenshots/
+├── testing.md
+├── audit-history.md
+└── integration-testing.md
+```
+
+Database documentation:
+
+```text
+database/
+└── DATABASE.md
 ```
 
 ---
 
-# 🗓️ Development Process
+# 🧾 Testing Documentation
 
-The project development will follow these stages:
+`testing.md` should contain:
 
-## Phase 1: Project Setup
+* Test environment
+* Test cases
+* Test steps
+* Expected results
+* Actual results
+* PASS / FAIL status
+* Bugs found
+* Bugs fixed
 
-* Create GitHub repository
-* Configure branches
-* Create folder structure
-* Configure development environments
+Example:
 
-## Phase 2: Database
+```text
+Test ID: TC-001
 
-* Design database
-* Create tenant structure
-* Create user structure
-* Create expense structure
-* Add relationships
-* Add sample data
+Test:
+Tenant A views expenses
 
-## Phase 3: Backend
+Steps:
+1. Login as Tenant A user.
+2. Open expense list.
+3. Request expenses.
 
-* Create Spring Boot project
-* Configure PostgreSQL
-* Implement authentication
-* Implement authorization
-* Implement tenant identification
-* Implement expense APIs
-* Implement multi-tenancy
+Expected:
+Only Tenant A expenses are returned.
 
-## Phase 4: Frontend
+Actual:
+[Record actual result after testing]
 
-* Create React application
-* Create login/register pages
-* Create dashboard
-* Create expense management pages
-* Connect frontend with backend APIs
-
-## Phase 5: Messaging
-
-* Configure Kafka
-* Create topics
-* Publish expense events
-* Implement consumers
-
-## Phase 6: DevOps
-
-* Create Dockerfiles
-* Configure Docker Compose
-* Configure Kubernetes
-* Configure monitoring
-
-## Phase 7: Integration
-
-* Connect all components
-* Test complete application
-* Fix integration issues
-* Test tenant isolation
-
-## Phase 8: Final Testing
-
-* Functional testing
-* Security testing
-* Multi-tenant isolation testing
-* Performance testing
-* Deployment testing
+Status:
+PASS / FAIL
+```
 
 ---
 
-# 🎯 Expected Final Result
+# 📝 Audit Documentation
 
-The final system should provide:
+`audit-history.md` explains:
+
+* What actions are recorded
+* Why audit history is required
+* Audit event structure
+* Audit flow
+* Tenant isolation of audit events
+* Example audit records
+
+---
+
+# 🔗 Integration Documentation
+
+`integration-testing.md` explains:
 
 ```text
-                    Multi-Tenant SaaS
+Frontend
+   ↓
+Backend API
+   ↓
+Authentication
+   ↓
+Tenant validation
+   ↓
+Database
+   ↓
+Response
+   ↓
+Frontend
+```
+
+It should also document:
+
+* Authentication integration
+* Expense workflow
+* Manager approval
+* Audit events
+* Tenant isolation
+* Reports
+* Common integration failures
+
+---
+
+# 🐛 Error Handling
+
+The application should handle common failures gracefully.
+
+Examples:
+
+```text
+Backend unavailable
+Database unavailable
+Invalid token
+Expired token
+Invalid expense
+Missing required fields
+Unauthorized role
+Wrong tenant
+Non-existent expense
+```
+
+The frontend should show meaningful error messages instead of crashing.
+
+The testing team should reproduce and document failures before fixes are applied.
+
+---
+
+# 🚫 Project Rules
+
+## Do Not
+
+* Change another team member's module without discussion.
+* Change API contracts without informing the backend developer.
+* Introduce MongoDB.
+* Introduce unnecessary technologies.
+* Create unnecessary files.
+* Commit secrets.
+* Hard-code tenant IDs.
+* Allow frontend tenant selection.
+* Trust frontend tenant isolation as a security mechanism.
+* Create fake testing results.
+* Silently modify another person's work.
+
+---
+
+# 🏢 Future Enterprise Tenant Isolation
+
+The first implementation uses:
+
+```text
+Shared Database
++
+Shared Tables
++
+tenantId isolation
+```
+
+The project can later support enterprise tenants using:
+
+```text
+Public / Shared Schema
+        +
+Private PostgreSQL Schema
+```
+
+For example:
+
+```text
+public
+├── shared application data
+
+tenant_enterprise_a
+├── tenant-specific data
+```
+
+This should be introduced only when required.
+
+The project will not automatically create hundreds of schemas.
+
+A practical migration strategy can be designed later for enterprise tenants.
+
+---
+
+# 📋 Final Deliverables
+
+At the end of development, the project should provide:
+
+## Frontend
+
+* Login/Register
+* Protected routes
+* Dashboard
+* Expense management
+* Manager approval
+* Finance/reimbursement
+* Audit History
+* Reports
+* Role-based navigation
+* Responsive UI
+* API integration
+* Error/loading/empty states
+
+## Database
+
+* PostgreSQL database
+* Prisma schema
+* Migrations
+* Relationships
+* Constraints
+* Indexes
+* Seed data
+* Tenant isolation support
+* Database documentation
+
+## Backend
+
+* Express REST APIs
+* Authentication
+* JWT
+* Tenant identification
+* Business logic
+* Authorization
+* Database integration
+
+## Testing & Documentation
+
+* Audit History
+* Test checklist
+* API testing
+* Tenant isolation testing
+* Integration testing
+* Bug/fix report
+* Documentation
+* PPT evidence
+
+---
+
+# ✅ Final Testing Checklist
+
+```text
+[ ] Registration works
+[ ] Login works
+[ ] Invalid login is rejected
+[ ] Logout works
+[ ] Protected routes work
+[ ] Employee can create expense
+[ ] Employee can view expenses
+[ ] Employee can edit expense
+[ ] Employee can delete expense
+[ ] Manager can view pending expenses
+[ ] Manager can approve expense
+[ ] Manager can reject expense
+[ ] Finance can view approved expenses
+[ ] Reimbursement workflow works
+[ ] Reports display correct data
+[ ] Audit events are generated
+[ ] Audit history is displayed
+[ ] Tenant A sees only Tenant A data
+[ ] Tenant B sees only Tenant B data
+[ ] Cross-tenant expense access is rejected
+[ ] Cross-tenant audit access is rejected
+[ ] Unauthorized requests are rejected
+[ ] Invalid tokens are handled
+[ ] Expired tokens are handled
+[ ] Backend failure is handled
+[ ] Database failure is handled
+[ ] Mobile UI works
+[ ] Tablet UI works
+[ ] Desktop UI works
+[ ] Production build succeeds
+```
+
+---
+
+# 📸 Hackathon PPT Evidence
+
+The team should collect real screenshots showing:
+
+1. Tenant isolation test
+2. Audit History
+3. Expense workflow
+4. API testing in Postman
+5. Dashboard
+6. Manager approval
+7. Database/Prisma structure
+8. Test result summary
+
+Only actual test results should be presented.
+
+---
+
+# 🚀 Production Build
+
+For the React frontend:
+
+```bash
+npm run build
+```
+
+The generated production files will normally be placed in:
+
+```text
+dist/
+```
+
+The exact deployment process depends on the final hosting environment.
+
+---
+
+# 🤝 Team Collaboration
+
+Each team member should work only on their assigned responsibility.
+
+Before modifying another module:
+
+```text
+Identify the issue
+      ↓
+Discuss with responsible member
+      ↓
+Agree on the change
+      ↓
+Implement
+      ↓
+Test
+      ↓
+Document
+```
+
+This prevents conflicts and accidental overwriting of another member's work.
+
+---
+
+# 📌 Project Summary
+
+The **Multi-Tenant SaaS Expense Tracker** provides a complete expense management platform for multiple organizations.
+
+The core architecture is:
+
+```text
+                    MULTI-TENANT SaaS
                            │
           ┌────────────────┼────────────────┐
           │                │                │
        Tenant A         Tenant B         Tenant C
           │                │                │
        Users            Users            Users
+       Expenses         Expenses         Expenses
+       Audits           Audits           Audits
           │                │                │
-      Expenses         Expenses         Expenses
+          └────────────────┼────────────────┘
+                           │
+                    Secure REST API
+                           │
+                       PostgreSQL
 ```
 
-Each tenant should be able to use the same application while its data remains isolated from other tenants.
+The central security principle is:
+
+> **A tenant can access only its own data.**
+
+The backend enforces tenant isolation, the database maintains the required relationships and constraints, the frontend consumes secure APIs, and the testing team verifies that the complete system behaves correctly.
 
 ---
 
-# 👨‍💻 Team Collaboration
-
-All team members are responsible for:
-
-* Completing assigned tasks
-* Maintaining clean code
-* Following the Git workflow
-* Testing their changes
-* Communicating blockers
-* Creating Pull Requests
-* Reviewing code when requested
-* Keeping documentation updated
-
-The team leader is responsible for:
-
-* Repository management
-* Branch management
-* Task coordination
-* Reviewing Pull Requests
-* Integrating team members' work
-* Final testing
-* Final deployment coordination
-
----
-
-# 📌 Project Status
-
-Current status:
+# 👨‍💻 Development Status
 
 ```text
-[ ] Repository setup
-[ ] Team members invited
-[ ] Branches created
-[ ] Project structure created
-[ ] Database setup
-[ ] Backend development
-[ ] Frontend development
-[ ] Authentication
-[ ] Multi-tenancy
-[ ] Expense management
-[ ] Kafka integration
-[ ] Docker setup
-[ ] Kubernetes setup
-[ ] Monitoring
-[ ] Integration testing
-[ ] Final testing
-[ ] Deployment
+Project Setup              ⬜
+Frontend                    ⬜
+Backend                     ⬜
+Database                    ⬜
+Authentication              ⬜
+Expense Management          ⬜
+Manager Approval            ⬜
+Finance                     ⬜
+Audit History               ⬜
+Reports                     ⬜
+Tenant Isolation            ⬜
+Integration Testing         ⬜
+Documentation               ⬜
+Final Testing               ⬜
+Production Build            ⬜
 ```
+
+Update this section as development progresses.
 
 ---
 
@@ -952,14 +1852,4 @@ Current status:
 
 This project is developed as an academic/hackathon project.
 
----
-
-# 🙌 Team
-
-**Project:** Multi-Tenant SaaS Expense Tracker
-
-**Team:** [Your Team Name]
-
-**Institution:** [Your College Name]
-
-**Year:** 2026
+License details can be added based on the team's final requirements.
