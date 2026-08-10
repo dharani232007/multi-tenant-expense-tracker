@@ -223,10 +223,10 @@ multi-tenant-expense-tracker/
 
 | Member   | Role                            | Main Responsibility                                          |
 | -------- | ------------------------------- | ------------------------------------------------------------ |
-| Member 1 | Team Leader / Backend Developer | Backend APIs, authentication, tenant management, integration |
-| Member 2 | Frontend Developer              | React UI, dashboard, expense screens                         |
-| Member 3 | Database Developer              | PostgreSQL schema, tables, relationships, database setup     |
-| Member 4 | DevOps / Integration Developer  | Docker, Kafka, Kubernetes, monitoring, deployment            |
+| Dharani  |  Backend Developer | Backend APIs, authentication, tenant management, integration |
+| Archana  | Frontend Developer              | React UI, dashboard, expense screens                         |
+| Sarulatha | Database Developer              | PostgreSQL schema, tables, relationships, database setup     |
+| Haripriya | DevOps / Integration Developer  | Docker, Kafka, Kubernetes, monitoring, deployment            |
 
 > Replace the member names and roles with the actual team information.
 
